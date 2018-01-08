@@ -4,6 +4,7 @@ use hyper::{self, Client, Method, Request};
 use tokio_core::reactor::Core;
 use futures::{future, Future, Stream};
 use hyper_tls::HttpsConnector;
+use hyper::Uri;
 
 type HttpsClient = Client<HttpsConnector<hyper::client::HttpConnector>>;
 
@@ -11,10 +12,19 @@ pub struct PushoverClient<'a> {
   core: Core,
   client: HttpsClient,
   key: &'a String,
+  uri: Uri,
 }
 
 impl<'a> PushoverClient<'a> {
   pub fn from(key: &'a String) -> Option<Self> {
+    let uri = match "https://api.pushover.net/1/messages.json".parse() {
+      Ok(uri) => uri,
+      Err(err) => {
+        println!("Unable to parse pushover URI: {}", err);
+        return None;
+      }
+    };
+
     let core = match Core::new() {
       Ok(c) => c,
       Err(_) => return None,
@@ -28,23 +38,22 @@ impl<'a> PushoverClient<'a> {
       core: core,
       client: client,
       key: &key,
+      uri: uri,
     })
   }
 
-  pub fn push(&mut self, user: &String, message: &String) -> io::Result<()> {
-    let uri = match "https://api.pushover.net/1/messages.json".parse() {
-      Ok(uri) => uri,
-      Err(err) => return Err(Error::new(ErrorKind::Other, err)),
-    };
-
-    let mut req = Request::new(Method::Post, uri);
-    let body = form_urlencoded::Serializer::new(String::new())
+  fn make_body(&self, user: &String, message: &String) -> String {
+    form_urlencoded::Serializer::new(String::new())
       .append_pair("user", user)
       .append_pair("token", self.key)
       .append_pair("message", message)
-      .finish();
+      .finish()
+  }
 
-    req.set_body(body);
+  pub fn push(&mut self, user: &String, message: &String) -> io::Result<()> {
+    let mut req = Request::new(Method::Post, self.uri.clone());
+    req.set_body(self.make_body(&user, &message));
+
     let work = self
       .client
       .request(req)
