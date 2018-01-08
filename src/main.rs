@@ -2,51 +2,25 @@ extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
 extern crate tokio_core;
+extern crate url;
 
-use futures::Future;
-use hyper::{Client, Method, Request};
-use hyper::header::ContentType;
-use tokio_core::reactor::Core;
-use hyper_tls::HttpsConnector;
-use std::io::{self, Error, ErrorKind};
-
-type HttpsClient = Client<HttpsConnector<hyper::client::HttpConnector>>;
+mod pushover_client;
+use pushover_client::PushoverClient;
 
 fn main() {
-    let mut core = Core::new().expect("could not create core");
-    let client = Client::configure()
-        .connector(HttpsConnector::new(4, &core.handle()).unwrap())
-        .build(&core.handle());
+    let mut args = std::env::args().skip(1);
+    let key = args.next()
+        .expect("pass pushover key as first positional arg");
+    let user = args.next().expect("pass user key as second arg");
+    let message = args.next().expect("pass message as third arg");
 
-    if let Err(err) = run(&mut core, &client) {
-        panic!(err)
-    }
-}
-
-fn run(core: &mut Core, client: &HttpsClient) -> io::Result<()> {
-    let uri = match "https://api.pushover.net/1/messages.json".parse() {
-        Ok(uri) => uri,
-        Err(err) => return Err(Error::new(ErrorKind::Other, err)),
-    };
-
-    let mut req = Request::new(Method::Get, uri);
-    req.headers_mut().set(ContentType::json());
-    //let mut body = req.body();
-    let work = client
-        .request(req)
-        .map(|res| {
-            println!("POST: {}", res.status());
-            println!("Headers: \n{}", res.headers())
-        })
-        .map_err(|err| Error::new(ErrorKind::Other, err));
-
-    core.run(work)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    let pc = PushoverClient::from(&key);
+    match pc {
+        Some(mut client) => {
+            if let Err(err) = client.push(&user, &message) {
+                panic!(err)
+            }
+        }
+        None => panic!("could not create client"),
     }
 }
