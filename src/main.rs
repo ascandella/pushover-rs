@@ -7,17 +7,28 @@ use futures::Future;
 use hyper::{Client, Method, Request};
 use hyper::header::ContentType;
 use tokio_core::reactor::Core;
+use hyper_tls::HttpsConnector;
+use std::io::{self, Error, ErrorKind};
+
+type HttpsClient = Client<HttpsConnector<hyper::client::HttpConnector>>;
 
 fn main() {
-    run()
-}
-
-fn run() {
     let mut core = Core::new().expect("could not create core");
     let client = Client::configure()
-        .connector(::hyper_tls::HttpsConnector::new(4, &core.handle()).unwrap())
+        .connector(HttpsConnector::new(4, &core.handle()).unwrap())
         .build(&core.handle());
-    let uri = "https://api.pushover.net/1/messages.json".parse().unwrap();
+
+    if let Err(err) = run(&mut core, &client) {
+        panic!(err)
+    }
+}
+
+fn run(core: &mut Core, client: &HttpsClient) -> io::Result<()> {
+    let uri = match "https://api.pushover.net/1/messages.json".parse() {
+        Ok(uri) => uri,
+        Err(err) => return Err(Error::new(ErrorKind::Other, err)),
+    };
+
     let mut req = Request::new(Method::Get, uri);
     req.headers_mut().set(ContentType::json());
     //let mut body = req.body();
@@ -27,9 +38,9 @@ fn run() {
             println!("POST: {}", res.status());
             println!("Headers: \n{}", res.headers())
         })
-        .map_err(|err| panic!("Error: {:?}", err));
+        .map_err(|err| Error::new(ErrorKind::Other, err));
 
-    core.run(work).expect("Could not run tokio core");
+    core.run(work)
 }
 
 #[cfg(test)]
