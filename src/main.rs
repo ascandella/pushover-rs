@@ -9,7 +9,8 @@ use pushover_client::PushoverClient;
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let key = args.next()
+    let key = args
+        .next()
         .expect("pass pushover key as first positional arg");
     let user = args.next().expect("pass user key as second arg");
     let message = args.next().expect("pass message as third arg");
