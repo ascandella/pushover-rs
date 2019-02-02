@@ -19,9 +19,9 @@ fn main() {
     match pc {
         Ok(mut client) => {
             if let Err(err) = client.push(&user, &message) {
-                panic!(err)
+                eprintln!("{}", err)
             }
         }
-        Err(err) => panic!(err),
+        Err(err) => eprintln!("Unable to push: {:?}", err),
     }
 }

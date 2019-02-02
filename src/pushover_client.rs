@@ -7,6 +7,7 @@ use std::io::{self, Error, ErrorKind};
 use tokio_core::reactor::Core;
 use url::form_urlencoded;
 
+#[derive(Debug)]
 pub enum ClientError {
     Error(Error),
     HyperTlsError(hyper_tls::Error),
@@ -90,7 +91,7 @@ impl<'a> PushoverClient<'a> {
 
         let body_work = self.core.run(work)?;
         if let Ok(resp_body) = self.core.run(body_work) {
-            println!("Body: {}", resp_body);
+            println!("{}", resp_body);
         }
 
         Ok(())
