@@ -88,13 +88,9 @@ impl<'a> PushoverClient<'a> {
             })
             .map_err(|err| Error::new(ErrorKind::Other, err));
 
-        match self.core.run(work) {
-            Ok(body_work) => {
-                if let Ok(resp_body) = self.core.run(body_work) {
-                    println!("Body: {}", resp_body);
-                }
-            }
-            Err(err) => return Err(err),
+        let body_work = self.core.run(work)?;
+        if let Ok(resp_body) = self.core.run(body_work) {
+            println!("Body: {}", resp_body);
         }
 
         Ok(())
