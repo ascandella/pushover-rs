@@ -17,11 +17,11 @@ fn main() {
 
     let pc = PushoverClient::from(&key);
     match pc {
-        Some(mut client) => {
+        Ok(mut client) => {
             if let Err(err) = client.push(&user, &message) {
                 panic!(err)
             }
         }
-        None => panic!("could not create client"),
+        Err(err) => panic!(err),
     }
 }

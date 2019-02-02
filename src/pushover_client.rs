@@ -1,40 +1,53 @@
 use futures::{future, Future, Stream};
+use hyper::http::uri::InvalidUri;
 use hyper::Uri;
-use hyper::{self, Client, Method, Request};
+use hyper::{self, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use std::io::{self, Error, ErrorKind};
 use tokio_core::reactor::Core;
 use url::form_urlencoded;
 
-type HttpsClient = Client<HttpsConnector<hyper::client::HttpConnector>>;
+pub enum ClientError {
+    Error(Error),
+    HyperTlsError(hyper_tls::Error),
+    UriError(InvalidUri),
+}
+
+impl From<Error> for ClientError {
+    fn from(error: Error) -> Self {
+        ClientError::Error(error)
+    }
+}
+
+impl From<hyper_tls::Error> for ClientError {
+    fn from(error: hyper_tls::Error) -> Self {
+        ClientError::HyperTlsError(error)
+    }
+}
+
+impl From<InvalidUri> for ClientError {
+    fn from(error: InvalidUri) -> Self {
+        ClientError::UriError(error)
+    }
+}
 
 pub struct PushoverClient<'a> {
     core: Core,
-    client: HttpsClient,
+    client: Client<HttpsConnector<hyper::client::HttpConnector>>,
     key: &'a String,
     uri: Uri,
 }
 
 impl<'a> PushoverClient<'a> {
-    pub fn from(key: &'a String) -> Option<Self> {
-        let uri = match "https://api.pushover.net/1/messages.json".parse() {
-            Ok(uri) => uri,
-            Err(err) => {
-                println!("Unable to parse pushover URI: {}", err);
-                return None;
-            }
-        };
+    pub fn from(key: &'a String) -> Result<Self, ClientError> {
+        let uri = "https://api.pushover.net/1/messages.json".parse()?;
 
-        let core = match Core::new() {
-            Ok(c) => c,
-            Err(_) => return None,
-        };
+        let core = Core::new()?;
 
-        let client = Client::configure()
-            .connector(HttpsConnector::new(4, &core.handle()).unwrap())
-            .build(&core.handle());
+        let https = HttpsConnector::new(4)?;
+        let client = Client::builder().build::<_, Body>(https);
 
-        Some(PushoverClient {
+        Ok(PushoverClient {
             core: core,
             client: client,
             key: &key,
@@ -42,23 +55,28 @@ impl<'a> PushoverClient<'a> {
         })
     }
 
-    fn make_body(&self, user: &String, message: &String) -> String {
-        form_urlencoded::Serializer::new(String::new())
+    fn make_body(&self, user: &String, message: &String) -> Body {
+        let str_body = form_urlencoded::Serializer::new(String::new())
             .append_pair("user", user)
             .append_pair("token", self.key)
             .append_pair("message", message)
-            .finish()
+            .finish();
+
+        Body::from(str_body)
     }
 
     pub fn push(&mut self, user: &String, message: &String) -> io::Result<()> {
-        let mut req = Request::new(Method::Post, self.uri.clone());
-        req.set_body(self.make_body(&user, &message));
+        let req = Request::builder()
+            .uri(self.uri.clone())
+            .method("POST")
+            .body(self.make_body(&user, &message))
+            .unwrap();
 
         let work = self
             .client
             .request(req)
             .map(|res| {
-                res.body()
+                res.into_body()
                     .fold(Vec::new(), |mut v, chunk| {
                         v.extend(&chunk[..]);
                         future::ok::<_, hyper::Error>(v)
