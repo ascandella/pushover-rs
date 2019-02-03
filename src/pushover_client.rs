@@ -46,7 +46,7 @@ impl<'a> PushoverClient<'a> {
         let core = Core::new()?;
 
         let https = HttpsConnector::new(4)?;
-        let client = Client::builder().build::<_, Body>(https);
+        let client = Client::builder().build(https);
 
         Ok(PushoverClient {
             core,
