@@ -35,12 +35,12 @@ impl From<InvalidUri> for ClientError {
 pub struct PushoverClient<'a> {
     core: Core,
     client: Client<HttpsConnector<hyper::client::HttpConnector>>,
-    key: &'a String,
+    key: &'a str,
     uri: Uri,
 }
 
 impl<'a> PushoverClient<'a> {
-    pub fn from(key: &'a String) -> Result<Self, ClientError> {
+    pub fn from(key: &'a str) -> Result<Self, ClientError> {
         let uri = "https://api.pushover.net/1/messages.json".parse()?;
 
         let core = Core::new()?;
@@ -49,14 +49,14 @@ impl<'a> PushoverClient<'a> {
         let client = Client::builder().build::<_, Body>(https);
 
         Ok(PushoverClient {
-            core: core,
-            client: client,
+            core,
+            client,
             key: &key,
-            uri: uri,
+            uri,
         })
     }
 
-    fn make_body(&self, user: &String, message: &String) -> Body {
+    fn make_body(&self, user: &str, message: &str) -> Body {
         let str_body = form_urlencoded::Serializer::new(String::new())
             .append_pair("user", user)
             .append_pair("token", self.key)
@@ -66,7 +66,7 @@ impl<'a> PushoverClient<'a> {
         Body::from(str_body)
     }
 
-    pub fn push(&mut self, user: &String, message: &String) -> io::Result<()> {
+    pub fn push(&mut self, user: &str, message: &str) -> io::Result<()> {
         let req = Request::builder()
             .uri(self.uri.clone())
             .method("POST")
