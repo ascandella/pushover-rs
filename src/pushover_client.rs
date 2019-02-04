@@ -97,3 +97,14 @@ impl<'a> PushoverClient<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ctor() {
+        let client = PushoverClient::from("my key");
+        assert_eq!(client.is_ok(), true);
+    }
+}
